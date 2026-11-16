@@ -10,7 +10,7 @@ COPY src/Shared/ src/Shared/
 COPY src/${SERVICE}/ src/${SERVICE}/
 RUN dotnet publish src/${SERVICE}/${SERVICE}.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 ARG SERVICE
 ENV SERVICE_DLL=${SERVICE}.dll
 WORKDIR /app
