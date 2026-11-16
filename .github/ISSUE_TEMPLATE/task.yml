@@ -1,0 +1,21 @@
+name: Opgave
+description: En opgave på Kanban-boardet
+labels: ["task"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Område
+      options: [Kode, Rapport, Test, Infrastruktur/CI, Eksamen]
+    validations: { required: true }
+  - type: textarea
+    id: description
+    attributes:
+      label: Beskrivelse
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      value: |
+        - [ ]
