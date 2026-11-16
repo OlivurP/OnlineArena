@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Shared/Shared.csproj" />
+    <Project Path="src/ApiGateway/ApiGateway.csproj" />
+    <Project Path="src/AuthService/AuthService.csproj" />
+    <Project Path="src/MatchmakingService/MatchmakingService.csproj" />
+    <Project Path="src/StatsService/StatsService.csproj" />
+    <Project Path="src/GameServer/GameServer.csproj" />
+    <Project Path="src/GameClient/GameClient.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OnlineArena.Tests/OnlineArena.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+    <File Path="Dockerfile" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

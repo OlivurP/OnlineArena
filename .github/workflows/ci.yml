@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore OnlineArena.slnx
+      - run: dotnet build OnlineArena.slnx -c Release --no-restore
+      - run: dotnet test OnlineArena.slnx -c Release --no-build --logger "trx;LogFileName=results.trx"
+
+  docker-smoke-test:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Byg og start hele systemet
+        run: docker compose up -d --build --wait
+      - name: Smoke test gennem gatewayen
+        run: |
+          curl --fail http://localhost:8080/health/ready
+          curl --fail http://localhost:8080/api/stats/leaderboard
+      - name: Rate limit test (k6)
+        run: docker run --rm --network host -v "$PWD/tests/load:/scripts" grafana/k6 run /scripts/auth-rate-limit.js
+      - name: Logs ved fejl
+        if: failure()
+        run: docker compose logs
+      - name: Ryd op
+        if: always()
+        run: docker compose down -v

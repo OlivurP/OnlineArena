@@ -1,0 +1,99 @@
+name: online-arena
+
+# Hemmeligheder læses fra .env (se .env.example). Defaults er KUN til lokal udvikling.
+x-common-env: &common-env
+  Jwt__Secret: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+  Internal__ApiKey: ${INTERNAL_API_KEY:-dev-internal-key}
+  RabbitMq__HostName: rabbitmq
+  RabbitMq__UserName: ${RABBITMQ_USER:-game}
+  RabbitMq__Password: ${RABBITMQ_PASSWORD:-game-dev-password}
+
+x-http-health: &http-health
+  test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
+  interval: 5s
+  timeout: 3s
+  retries: 12
+  start_period: 5s
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-game}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-game-dev-password}
+    ports:
+      - "15672:15672"   # management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    build: { context: ., args: { SERVICE: AuthService } }
+    environment:
+      <<: *common-env
+      Seed__AdminPassword: ${ADMIN_PASSWORD:-admin123}
+    healthcheck: *http-health
+
+  matchmaking:
+    build: { context: ., args: { SERVICE: MatchmakingService } }
+    environment: *common-env
+    healthcheck: *http-health
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  stats:
+    build: { context: ., args: { SERVICE: StatsService } }
+    environment: *common-env
+    healthcheck: *http-health
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  gateway:
+    build: { context: ., args: { SERVICE: ApiGateway } }
+    environment: *common-env
+    ports:
+      - "8080:8080"     # ENESTE HTTP-indgang udefra
+    healthcheck: *http-health
+    depends_on:
+      auth: { condition: service_healthy }
+      matchmaking: { condition: service_healthy }
+      stats: { condition: service_healthy }
+
+  gameserver-1:
+    build: { context: ., args: { SERVICE: GameServer } }
+    environment:
+      <<: *common-env
+      GameServer__ServerId: gameserver-1
+      GameServer__UdpPort: "7777"
+      GameServer__PublicHost: localhost
+      GameServer__PublicPort: "7777"
+      GameServer__InternalBaseUrl: http://gameserver-1:8080
+      GameServer__MatchmakingUrl: http://matchmaking:8080
+    ports:
+      - "7777:7777/udp"
+    healthcheck: *http-health
+    depends_on:
+      matchmaking: { condition: service_healthy }
+
+  gameserver-2:
+    build: { context: ., args: { SERVICE: GameServer } }
+    environment:
+      <<: *common-env
+      GameServer__ServerId: gameserver-2
+      GameServer__UdpPort: "7778"
+      GameServer__PublicHost: localhost
+      GameServer__PublicPort: "7778"
+      GameServer__InternalBaseUrl: http://gameserver-2:8080
+      GameServer__MatchmakingUrl: http://matchmaking:8080
+    ports:
+      - "7778:7778/udp"
+    healthcheck: *http-health
+    depends_on:
+      matchmaking: { condition: service_healthy }
+
+volumes:
+  rabbitmq-data:
