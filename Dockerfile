@@ -1,5 +1,5 @@
 # Fælles multi-stage Dockerfile. Vælg service med build-arg: --build-arg SERVICE=AuthService
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 ARG SERVICE
 WORKDIR /src
 COPY Directory.Build.props ./
