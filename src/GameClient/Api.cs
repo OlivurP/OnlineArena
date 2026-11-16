@@ -4,6 +4,8 @@ using Shared.Contracts;
 
 namespace GameClient;
 
+// Ændring til test
+
 internal static class Api
 {
     public static async Task<TokenResponse?> LoginOrRegisterAsync(HttpClient http, string username, string password)
