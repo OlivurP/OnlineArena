@@ -12,8 +12,8 @@ jobs:
       # Docker findes på ubuntu-latest: Testcontainers-tests må ikke springes over i CI
       REQUIRE_DOCKER_TESTS: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '11.0.x'
       - run: dotnet restore OnlineArena.slnx
@@ -46,7 +46,7 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Byg og start hele systemet
         run: docker compose up -d --build --wait
       - name: Smoke test gennem gatewayen
