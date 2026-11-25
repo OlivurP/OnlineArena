@@ -1,0 +1,12 @@
+# Overlay til end-to-end tests: korte matches, så testen ikke skal vente 90 sekunder.
+# docker compose -f docker-compose.yml -f tests/e2e/docker-compose.e2e.yml up -d --build --wait
+services:
+  gameserver-1:
+    environment:
+      GameServer__MatchDurationSeconds: "5"
+      GameServer__IntermissionSeconds: "2"
+
+  gameserver-2:
+    environment:
+      GameServer__MatchDurationSeconds: "5"
+      GameServer__IntermissionSeconds: "2"

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 namespace Shared.Messaging;
 
@@ -28,7 +29,10 @@ public sealed class EventPublisher(IOptions<RabbitMqOptions> options, ILogger<Ev
         await RabbitConnector.DeclareTopologyAsync(_channel, ct);
     }
 
-    /// <summary>Kaster exception hvis brokeren ikke bekræfter – kalderen (outbox relay) prøver igen.</summary>
+    /// <summary>
+    /// Kaster exception hvis brokeren ikke bekræfter (nack/forbindelsesfejl) – kalderen (outbox relay) prøver igen.
+    /// Events uden abonnenter (basic.return) logges og kastes ikke, da et genforsøg aldrig ville lykkes.
+    /// </summary>
     public async Task PublishAsync(string routingKey, Guid messageId, object payload, CancellationToken ct)
     {
         if (_channel is null) throw new InvalidOperationException("Publisher er ikke startet");
@@ -49,6 +53,13 @@ public sealed class EventPublisher(IOptions<RabbitMqOptions> options, ILogger<Ev
             // mandatory: true => beskeder der ikke kan routes returneres i stedet for at forsvinde
             await _channel.BasicPublishAsync(Topology.EventsExchange, routingKey,
                 mandatory: true, basicProperties: properties, body: body, cancellationToken: ct);
+        }
+        catch (PublishException ex) when (ex.IsReturn)
+        {
+            // Ingen kø abonnerer på routing key'en. Et genforsøg ændrer ikke på det og ville blokere
+            // outboxen for alle efterfølgende events – så log og gå videre. (Nack fra brokeren kastes stadig.)
+            logger.LogWarning("Event {Type} ({MessageId}) har ingen abonnenter på {RoutingKey} og blev ikke leveret",
+                properties.Type, messageId, routingKey);
         }
         finally
         {

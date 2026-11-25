@@ -8,6 +8,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # Docker findes på ubuntu-latest: Testcontainers-tests må ikke springes over i CI
+      REQUIRE_DOCKER_TESTS: "true"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -15,7 +18,29 @@ jobs:
           dotnet-version: '11.0.x'
       - run: dotnet restore OnlineArena.slnx
       - run: dotnet build OnlineArena.slnx -c Release --no-restore
-      - run: dotnet test OnlineArena.slnx -c Release --no-build --logger "trx;LogFileName=results.trx"
+      - name: Unit-, API-, UDP- og integrationstests (RabbitMQ via Testcontainers)
+        run: dotnet test OnlineArena.slnx -c Release --no-build --filter "Category!=E2E" --logger "trx;LogFileName=results.trx"
+
+  e2e-test:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+      - name: Byg og start hele systemet (korte matches)
+        run: docker compose -f docker-compose.yml -f tests/e2e/docker-compose.e2e.yml up -d --build --wait
+      - name: End-to-end tests gennem gateway og UDP
+        env:
+          E2E_GATEWAY_URL: http://localhost:8080
+        run: dotnet test tests/OnlineArena.Tests -c Release --filter "Category=E2E" --logger "trx;LogFileName=e2e-results.trx"
+      - name: Logs ved fejl
+        if: failure()
+        run: docker compose logs
+      - name: Ryd op
+        if: always()
+        run: docker compose -f docker-compose.yml -f tests/e2e/docker-compose.e2e.yml down -v
 
   docker-smoke-test:
     needs: build-and-test
