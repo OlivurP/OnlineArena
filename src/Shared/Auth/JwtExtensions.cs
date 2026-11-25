@@ -12,7 +12,8 @@ public static class JwtExtensions
         services.Configure<JwtOptions>(section);
 
         var options = section.Get<JwtOptions>() ?? new JwtOptions();
-        if (options.Secret.Length < 32)
+        // Secret kan være null, hvis nøglen findes i konfigurationen uden værdi (fx "Jwt__Secret=")
+        if (options.Secret is null || options.Secret.Length < 32)
         {
             throw new InvalidOperationException(
                 "Jwt:Secret mangler eller er kortere end 32 tegn. Sæt den via miljøvariablen Jwt__Secret.");

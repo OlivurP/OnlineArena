@@ -78,19 +78,34 @@ OpenAPI/Scalar findes på `/scalar` på hver service i Development.
 ## Tests
 
 ```bash
-dotnet test OnlineArena.slnx                                  # unit tests
+dotnet test OnlineArena.slnx --filter "Category!=E2E"         # unit-, API-, UDP- og integrationstests
+
+# End-to-end mod hele systemet (korte matches via overlay-filen)
+docker compose -f docker-compose.yml -f tests/e2e/docker-compose.e2e.yml up -d --build --wait
+E2E_GATEWAY_URL=http://localhost:8080 dotnet test tests/OnlineArena.Tests --filter "Category=E2E"
+docker compose -f docker-compose.yml -f tests/e2e/docker-compose.e2e.yml down -v
+
 docker run --rm --network host -v "$PWD/tests/load:/scripts" grafana/k6 run /scripts/auth-rate-limit.js
 ```
+
+I PowerShell sættes variablen med `$env:E2E_GATEWAY_URL = "http://localhost:8080"`.
+Integrationstestene (kategori `Integration`) starter selv en RabbitMQ-container med Testcontainers og springes over,
+hvis Docker ikke kører. I CI er `REQUIRE_DOCKER_TESTS=true` sat, så de fejler i stedet for at blive sprunget over.
+E2E-testene springes over, medmindre `E2E_GATEWAY_URL` er sat.
 
 `--network host` virker på Linux, som i CI-pipelinen. På Windows og Mac skal du i stedet køre scriptet med
 `-e GATEWAY=http://host.docker.internal:8080`.
 
 | Testtype | Hvor | Hvad testes |
 |---|---|---|
-| Unit | `tests/OnlineArena.Tests` | Spilregler, idempotens, matchmaking, prediction/reconciliation, codec |
+| Unit | `tests/OnlineArena.Tests` | Spilregler, idempotens, matchmaking, tokens/JWT, outbox, prediction/reconciliation, codec |
+| API (in-process) | `tests/OnlineArena.Tests/Api` | Auth-, matchmaking- og stats-endpoints via `WebApplicationFactory`: autorisation, API-nøgle, validering, health |
+| Gameserver over UDP | `tests/OnlineArena.Tests/GameLoopUdpTests.cs` | Rigtigt game loop over UDP med styret tid: join/JWT-afvisning, fuld server, reconnect, input-begrænsning, timeout, ugyldige pakker, match-livscyklus og events |
+| Integration (`Integration`) | `tests/OnlineArena.Tests/Messaging` | Rigtig RabbitMQ (Testcontainers): pub/sub til flere services, dubletter, dead-letter, retry, outbox relay og broker-udfald |
+| E2E (`E2E`) | `tests/OnlineArena.Tests/E2E` + CI-jobbet `e2e-test` | Registrér → kø → match over UDP → MatchEnded via RabbitMQ → statistik, alt gennem gatewayen |
 | Load/adfærd | `tests/load/auth-rate-limit.js` (k6) | Gatewayens rate limit (10 × 200/401, 2 × 429) |
-| Smoke/E2E | `.github/workflows/ci.yml` | Hele systemet startes med `compose --wait` og kaldes gennem gatewayen |
-| *Forslag* | – | Pact contract tests (gameserver ↔ matchmaking), Testcontainers-integrationstests |
+| Smoke | `.github/workflows/ci.yml` | Hele systemet startes med `compose --wait` og kaldes gennem gatewayen |
+| *Forslag* | – | Pact contract tests (gameserver ↔ matchmaking) |
 
 ## Pensum → kode (til rapporten)
 

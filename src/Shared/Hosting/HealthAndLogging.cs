@@ -61,7 +61,13 @@ public static class HostingExtensions
                 context.Request.Headers[CorrelationHeader] = id;
             }
 
-            context.Response.Headers[CorrelationHeader] = id;
+            // Sættes lige før svaret sendes, så headeren overskriver (ikke dubleres med) den,
+            // som YARP kopierer med fra downstream-servicen i gatewayen.
+            context.Response.OnStarting(() =>
+            {
+                context.Response.Headers[CorrelationHeader] = id;
+                return Task.CompletedTask;
+            });
 
             var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Correlation");
             using (logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = id.ToString() }))

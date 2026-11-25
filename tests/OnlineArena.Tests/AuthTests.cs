@@ -17,14 +17,37 @@ internal static class TestJwt
 
     public static TokenService CreateTokenService() => new(Options.Create(CreateOptions()));
 
-    public static string CreateAccessToken(string username, string role = Roles.Player) =>
+    public static string CreateAccessToken(string username, string role = Roles.Player, Guid? userId = null) =>
         CreateTokenService().CreateAccessToken(new User
         {
-            Id = Guid.NewGuid(),
+            Id = userId ?? Guid.NewGuid(),
             Username = username,
             PasswordHash = "-",
             Role = role
         }).Token;
+
+    /// <summary>Korrekt signeret token der udløb for længe siden (langt uden for ClockSkew).</summary>
+    public static string CreateExpiredAccessToken(string username)
+    {
+        var options = CreateOptions();
+        var issued = DateTime.UtcNow.AddHours(-2);
+        return new JsonWebTokenHandler().CreateToken(new Microsoft.IdentityModel.Tokens.SecurityTokenDescriptor
+        {
+            Issuer = options.Issuer,
+            Audience = options.Audience,
+            IssuedAt = issued,
+            NotBefore = issued,
+            Expires = issued.AddMinutes(15),
+            SigningCredentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
+                options.CreateSigningKey(), Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256),
+            Claims = new Dictionary<string, object>
+            {
+                ["sub"] = Guid.NewGuid().ToString(),
+                ["name"] = username,
+                ["role"] = Roles.Player
+            }
+        });
+    }
 }
 
 public class AccountServiceTests
@@ -273,6 +296,17 @@ public class JwtExtensionsTests
     public void MissingOrShortSecret_FailsAtStartup(string? secret)
     {
         Assert.Throws<InvalidOperationException>(() => Configure(secret));
+    }
+
+    [Fact]
+    public void SecretKeyPresentWithNullValue_FailsAtStartupWithClearError()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Jwt:Secret"] = null })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddGameJwtAuthentication(config));
+        Assert.Contains("Jwt:Secret", ex.Message);
     }
 
     [Fact]
